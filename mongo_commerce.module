@@ -1,0 +1,654 @@
+<?php
+
+/**
+ * @file
+ * The module file for the Mongo Commerce module.
+ *
+ * This file interacts with the front end and the the controller for Mongo DB.
+ */
+
+// Get the actual Mongo DB field names defined in module settings.
+global $_mongo_commerce_collection_name;
+global $_mongo_commerce_product_id_field;
+global $_mongo_commerce_node_id_field;
+global $_mongo_commerce_title_field;
+global $_mongo_commerce_price_field;
+global $_mongo_commerce_sku_field;
+global $_mongo_commerce_size_field;
+global $_mongo_commerce_color_field;
+global $_mongo_commerce_image_field;
+global $_mongo_commerce_status_field;
+global $_mongo_commerce_capacity_field;
+global $_mongo_commerce_bag_size_field;
+global $_mongo_commerce_hat_size_field;
+global $_mongo_commerce_shoe_size_field;
+
+$_mongo_commerce_collection_name = variable_get('mongo_commerce_collection', 'amazon_data');
+$_mongo_commerce_product_id_field = variable_get('mongo_commerce_product_id', 'product_id');
+$_mongo_commerce_node_id_field = variable_get('mongo_commerce_node_id', 'node_id');
+$_mongo_commerce_title_field = variable_get('mongo_commerce_title', 'name');
+$_mongo_commerce_price_field = variable_get('mongo_commerce_price', 'selling_price');
+$_mongo_commerce_sku_field = variable_get('mongo_commerce_sku', 'sku');
+$_mongo_commerce_size_field = variable_get('mongo_commerce_size', 'size');
+$_mongo_commerce_color_field = variable_get('mongo_commerce_color', 'color');
+$_mongo_commerce_image_field = variable_get('mongo_commerce_image', 'image');
+$_mongo_commerce_status_field = variable_get('mongo_commerce_status', 'status');
+$_mongo_commerce_capacity_field = variable_get('mongo_commerce_capacity', 'capacity');
+$_mongo_commerce_bag_size_field = variable_get('mongo_commerce_bag_size', 'bag_size');
+$_mongo_commerce_hat_size_field = variable_get('mongo_commerce_hat_size', 'hat_size');
+$_mongo_commerce_shoe_size_field = variable_get('mongo_commerce_shoe_size', 'shoe_size');
+
+/**
+ * Implements hook_entity_info().
+ */
+function mongo_commerce_entity_info() {
+  $return = array(
+    'mongo_product' => array(
+      'label' => t('Mongo Product'),
+      'controller class' => 'MongoCommerceMongoProductEntityController',
+    ),
+  );
+
+  return $return;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function mongo_commerce_menu() {
+
+  $items = array();
+
+  $items['admin/config/system/mongocommerce'] = array(
+    'title' => 'Mongo Commerce module settings',
+    'description' => 'Settings to define field names in Mongo DB for product catalog',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('mongo_commerce_admin'),
+    'access arguments' => array('administer mongo commerce settings'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['mongo/search'] = array(
+    'title' => 'Search - Mongo DB',
+    'description' => 'A form to search in MongoDB for products',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('mongo_commerce_search_form'),
+    'access arguments' => array('administer mongo commerce settings'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ * Function to define the admin settings form for this module.
+ */
+function mongo_commerce_admin() {
+  $form = array();
+
+  $form['mongo_commerce_collection'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Mongo DB Collection name'),
+    '#default_value' => variable_get('mongo_commerce_collection', 'amazon_data'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the collection name to be used in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_product_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product ID'),
+    '#default_value' => variable_get('mongo_commerce_product_id', 'product_id'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the Product ID field in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_node_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Node ID'),
+    '#default_value' => variable_get('mongo_commerce_node_id', 'node_id'),
+    '#size' => 15,
+    '#maxlength' => 15,
+    '#description' => t("Defines the Node ID field in Mongo DB which relates the product to the Drupal node."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_title'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Title'),
+    '#default_value' => variable_get('mongo_commerce_title', 'name'),
+    '#size' => 15,
+    '#maxlength' => 15,
+    '#description' => t("Defines the title of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_price'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Price'),
+    '#default_value' => variable_get('mongo_commerce_price', 'selling_price'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the title of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_sku'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product SKU'),
+    '#default_value' => variable_get('mongo_commerce_sku', 'sku'),
+    '#size' => 10,
+    '#maxlength' => 10,
+    '#description' => t("Defines the SKU of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_size'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Size'),
+    '#default_value' => variable_get('mongo_commerce_size', 'size'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the Size of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_color'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Color'),
+    '#default_value' => variable_get('mongo_commerce_color', 'color'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the Color of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_image'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Image'),
+    '#default_value' => variable_get('mongo_commerce_image', 'image'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the Image path of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_status'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Status'),
+    '#default_value' => variable_get('mongo_commerce_status', 'status'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the status of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_capacity'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Capacity - For Storage Devices only'),
+    '#default_value' => variable_get('mongo_commerce_capacity', 'capacity'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the capacity of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_bag_size'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Bag Size - For Bags only'),
+    '#default_value' => variable_get('mongo_commerce_bag_size', 'bag_size'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the size of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_hat_size'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Hat Size - For Hats only'),
+    '#default_value' => variable_get('mongo_commerce_hat_size', 'hat_size'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the size of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  $form['mongo_commerce_shoe_size'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product Shoe Size - For Shoes only'),
+    '#default_value' => variable_get('mongo_commerce_shoe_size', 'shoe_size'),
+    '#size' => 20,
+    '#maxlength' => 20,
+    '#description' => t("Defines the size of the product in Mongo DB."),
+    '#required' => TRUE,
+  );
+
+  return system_settings_form($form);
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function mongo_commerce_block_info() {
+  $blocks = array();
+  $blocks['search_results'] = array(
+    'info' => t('Mongo DB Search results'),
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function mongo_commerce_block_view($delta = '') {
+  $block = array();
+
+  switch ($delta) {
+    case 'search_results':
+      $block['subject'] = 'Mongo DB Search Results';
+      $block['content'] = $_SESSION{'search_results'};
+      break;
+  }
+
+  return $block;
+}
+
+/**
+ * Function for the search form.
+ */
+function mongo_commerce_search_form($form, &$form_state) {
+  $_SESSION{'search_results'} = 'Please give your search criteria/No results found';
+  $form['search_brand'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Search Brand'),
+    '#size' => 20,
+    '#maxlength' => 20,
+  );
+
+  $form['search_type'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Search Type'),
+    '#size' => 20,
+    '#maxlength' => 20,
+  );
+
+  $form['submit_button'] = array(
+    '#type' => 'submit',
+    '#value' => t('Search'),
+  );
+
+  $form['#submit'][] = 'mongo_commerce_search_form_submit';
+  $options = array('absolute' => TRUE);
+  if (isset($form_state['storage']['result'])) {
+    $content = '';
+    foreach ($form_state['storage']['result'] as $res) {
+      $content .= "</br><strong>Product Title:</strong> " . $res['name'] . "</br><strong>Product Page:</strong> <a href=" . url('node/' . $res['node_id'], $options) . ">Click Here</a>";
+    }
+    $_SESSION{'search_results'} = $content;
+  }
+
+  return $form;
+}
+
+/**
+ * Function to handle search submit.
+ */
+function mongo_commerce_search_form_submit($form, &$form_state) {
+  $search_result = entity_get_controller('mongo_product')->searchMongoDb($form, $form_state);
+  $form_state['storage']['result'] = $search_result;
+  $form_state['rebuild'] = TRUE;
+}
+
+/**
+ * Implements hook_entity_load().
+ */
+function mongo_commerce_entity_load($entities, $type) {
+  // This hook is implemented to load the products from the MongoDB instead of MYSQL.
+  $matched_id = array();
+  // Get the actual Mongo DB field names defined in module settings.
+  global $_mongo_commerce_product_id_field;
+  global $_mongo_commerce_title_field;
+  global $_mongo_commerce_price_field;
+  global $_mongo_commerce_sku_field;
+  global $_mongo_commerce_size_field;
+  global $_mongo_commerce_color_field;
+  global $_mongo_commerce_capacity_field;
+  global $_mongo_commerce_bag_size_field;
+  global $_mongo_commerce_hat_size_field;
+  global $_mongo_commerce_shoe_size_field;
+  global $_mongo_commerce_image_field;
+
+  // If collection products page get the products related to the collection.
+  // Current node if it is a single product page.
+  $current_prods = entity_load('mongo_product');
+  //There would be more than 1 SKU in a product and need to write this code to handle it.
+  foreach ($entities as $prods) {
+    // This is to get the current node which is displayed in Drupal:
+    // In order to find the corresponding product in MongoDB.
+    if (property_exists($prods, 'nid') && property_exists($prods, 'field_product')) {
+      // For each of the referenced products to a node: 
+      // we find the corresponding index in the related product array from MongoDB.
+      foreach ($prods->field_product[LANGUAGE_NONE] as $referenced_prods) {
+        $key = array_search($referenced_prods['product_id'], array_column($current_prods, $_mongo_commerce_product_id_field));
+        if (is_numeric($key)) {
+          $matched_id[] = $key;
+        }
+        else {
+          continue;
+        }
+      }
+      $prod_title = '';
+      foreach ($prods->field_product[LANGUAGE_NONE] as $referenced_prods) {
+        // For each of the matched products:
+        // We are appending the title from MongoDB to the title to be showed on screen.
+        if (count($matched_id)) {
+          foreach ($matched_id as $mongo_matches) {
+            if (isset($current_prods[$mongo_matches][$_mongo_commerce_product_id_field]) && ($referenced_prods['product_id'] == $current_prods[$mongo_matches][$_mongo_commerce_product_id_field])) {
+              if (arg(0) == 'product_category' && is_numeric(arg(1))) {
+                $prod_title = $current_prods[$mongo_matches][$_mongo_commerce_title_field] . "...";
+                break;
+              }
+              elseif (arg(0) == 'node' && is_numeric(arg(1))) {
+                $prod_title = $prod_title . $current_prods[$mongo_matches][$_mongo_commerce_title_field] . ",";
+              }
+            }
+          }
+        }
+        if ($prod_title != '') {
+          // Change the title of the Products from title in MongoDB.
+          $prods->title = $prod_title;
+          $prods->title_field[LANGUAGE_NONE][0]['safe_value'] = $prod_title;
+        }
+      }
+    }
+    elseif (property_exists($prods, 'product_id') && ($prods->status != 0)) {
+    // This is to update the product related details like price, color, etc...
+      $prod_price = 0;
+      $image_paths = array();
+      // For each of the referenced products to a node:
+      // We find the corresponding index in the related product array from MongoDB.
+      $key = array_search($prods->product_id, array_column($current_prods, $_mongo_commerce_product_id_field));
+      if (is_numeric($key)) {
+        $matched_id[] = $key;
+      }
+      if (count($matched_id)) {
+        foreach ($matched_id as $mongo_matches) {
+          if ($prods->product_id == $current_prods[$mongo_matches][$_mongo_commerce_product_id_field]) {
+            foreach ($current_prods as $key => $current_prods_values) {
+              $price_values[] = $current_prods_values[$_mongo_commerce_price_field];
+            }
+
+            if (property_exists($prods, 'field_images') && isset($current_prods[$mongo_matches][$_mongo_commerce_image_field])) {
+              $image_paths = explode(',', $current_prods[$mongo_matches][$_mongo_commerce_image_field]);
+              if (count($prods->field_images[LANGUAGE_NONE]) != 0 ) {
+                foreach ($prods->field_images[LANGUAGE_NONE] as $key => &$image) {
+                 $image['uri'] = $image_paths[$key];
+                }
+              }
+              else {
+                foreach ($image_paths as $key => $images) {
+                  $prods->field_images[LANGUAGE_NONE][$key]['uri'] = $images;
+                }
+              }
+            }
+
+            //For price if this page is a collection page the we display the lowest price otherwise if it is single product page we show the first price as per default behaviour in commerce kickstart
+            if (arg(0) == 'product_category' && is_numeric(arg(1))) {
+              $prod_price = min($price_values);
+            }
+            elseif (arg(0) == 'node' && is_numeric(arg(1))) {
+              $prods->sku = isset($current_prods[$mongo_matches][$_mongo_commerce_sku_field]) ? $current_prods[$mongo_matches][$_mongo_commerce_sku_field] : '';
+              $prod_price = isset($current_prods[$mongo_matches][$_mongo_commerce_price_field]) ? $current_prods[$mongo_matches][$_mongo_commerce_price_field] : '';
+              $prods->title = isset($current_prods[$mongo_matches][$_mongo_commerce_title_field]) ? $current_prods[$mongo_matches][$_mongo_commerce_title_field] : '';
+              $prods->title_field[LANGUAGE_NONE][0]['value'] = isset($current_prods[$mongo_matches][$_mongo_commerce_title_field]) ? $current_prods[$mongo_matches][$_mongo_commerce_title_field] : '';
+
+              if (property_exists($prods, 'field_color')) {
+                $prods->field_color[LANGUAGE_NONE][0]['tid'] = is_numeric($current_prods[$mongo_matches][$_mongo_commerce_color_field]) ? $current_prods[$mongo_matches][$_mongo_commerce_color_field] : '_none';
+              }
+
+              if (property_exists($prods, 'field_storage_capacity')) {
+                $prods->field_storage_capacity[LANGUAGE_NONE][0]['tid'] = is_numeric($current_prods[$mongo_matches][$_mongo_commerce_capacity_field]) ? $current_prods[$mongo_matches][$_mongo_commerce_capacity_field] : '_none';
+              }
+
+              if (property_exists($prods, 'field_top_size')) {
+                $prods->field_top_size[LANGUAGE_NONE][0]['tid'] = is_numeric($current_prods[$mongo_matches][$_mongo_commerce_size_field]) ? $current_prods[$mongo_matches][$_mongo_commerce_size_field] : '_none';
+              }
+
+              if (property_exists($prods, 'field_bag_size')) {
+                $prods->field_bag_size[LANGUAGE_NONE][0]['tid'] = is_numeric($current_prods[$mongo_matches][$_mongo_commerce_bag_size_field]) ? $current_prods[$mongo_matches][$_mongo_commerce_bag_size_field] : '_none';
+              }
+
+              if (property_exists($prods, 'field_hat_size')) {
+                $prods->field_hat_size[LANGUAGE_NONE][0]['tid'] = is_numeric($current_prods[$mongo_matches][$_mongo_commerce_hat_size_field]) ? $current_prods[$mongo_matches][$hat_size_field] : '_none';
+              }
+
+              if (property_exists($prods, 'field_shoe_size')) {
+                $prods->field_shoe_size[LANGUAGE_NONE][0]['tid'] = is_numeric($current_prods[$mongo_matches][$_mongo_commerce_shoe_size_field]) ? $current_prods[$mongo_matches][$_mongo_commerce_shoe_size_field] : '_none';
+              }
+
+              break;
+            }
+          }
+        }
+        if ($prod_price != 0) {
+          $prods->commerce_price[LANGUAGE_NONE][0]['amount'] = $prod_price;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function mongo_commerce_entity_update($entity, $type) {
+  // This hook is implemented to track changes to the main fields of the product:
+  // common to all the variations and update them in the DB.
+  entity_get_controller('mongo_product')->save($entity);
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function mongo_commerce_node_insert($node) {
+  // This hook is implemented to get the node ID related to the newly saved product:
+  // and update the same in MongoDB.
+  entity_get_controller('mongo_product')->updateNodeId($node);
+}
+
+/**
+ * Implements hook_field_attach_submit()
+ */
+function mongo_commerce_field_attach_submit($parent_entity_type, $parent_entity, $form, &$form_state) {
+  // This hook is implemented to track the changes in variation:
+  // and update them in the MongoDB database. 
+  // This also catches new product creation.
+  list(, , $bundle_name) = entity_extract_ids($parent_entity_type, $parent_entity);
+
+  foreach (field_info_instances($parent_entity_type, $bundle_name) as $instance) {
+    if (isset($instance['widget']) && strpos($instance['widget']['type'], 'inline_entity_form') === 0) {
+      $field_name = $instance['field_name'];
+      if (!isset($form[$field_name])) {
+        // The field wasn't found on this form, skip it.
+        // Usually happens on stub entity forms that don't contain all fields.
+        continue;
+      }
+      $langcode = $form[$field_name]['#language'];
+      if (!isset($form[$field_name][$langcode]['#ief_id'])) {
+        // The field is present on the form, but the IEF widget wasn't added,
+        // usually due to inline_entity_form_field_widget_properties_alter().
+        continue;
+      }
+      $ief_id = $form[$field_name][$langcode]['#ief_id'];
+      if (empty($form_state['inline_entity_form'][$ief_id])) {
+        // No data found, no need to do anything.
+        continue;
+      }
+
+      $values = $form_state['inline_entity_form'][$ief_id];
+      $entity_type = $values['settings']['entity_type'];
+      // Delete any entities staged for deletion.
+      if (!empty($values['delete'])) {
+        entity_get_controller('mongo_product')->delete(array_values($values['delete']));
+      }
+
+      // Respect the entity weights.
+      uasort($values['entities'], 'drupal_sort_weight');
+      // Go through the IEF data and assemble a list of ids.
+      $entity_ids = array();
+      $need_reset = FALSE;
+      foreach ($values['entities'] as $item) {
+        if ($item['needs_save']) {
+          entity_get_controller('mongo_product')->save($item['entity']);
+          $need_reset = TRUE;
+        }
+
+        list($entity_id) = entity_extract_ids($entity_type, $item['entity']);
+        $entity_ids[] = array($values['settings']['column'] => $entity_id);
+      }
+
+      // Prevent the entity from showing up in subsequent add forms.
+      // @todo Investigate a cleaner fix.
+      if (isset($form['#op']) && $form['#op'] == 'add' && $need_reset) {
+        $form_state['inline_entity_form'][$ief_id]['entities'] = array();
+      }
+
+      if (!empty($entity_ids)) {
+        // Set the list of ids as the field value.
+        $parent_entity->{$field_name}[$langcode] = $entity_ids;
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_views_pre_render()
+ */
+function mongo_commerce_views_pre_render(&$view) {
+  // This hook is implemented to modify title and SKU in Quick edit
+  global $_mongo_commerce_sku_field;
+  global $_mongo_commerce_title_field;
+
+  if ($view->name == 'commerce_backoffice_products') {
+    foreach ($view->result as $viewrow) {
+      $product_details = entity_get_controller('mongo_product')->fetchProductDetails($viewrow->commerce_product_field_data_field_product_product_id);
+      if (count($product_details) != 0) {
+        $viewrow->commerce_product_field_data_field_product_sku = $product_details[0][$_mongo_commerce_sku_field];
+        $viewrow->node_title = (strlen($product_details[0][$_mongo_commerce_title_field]) > 70) ? substr($product_details[0][$_mongo_commerce_title_field], 0, 70) . '...' : $product_details[0][$_mongo_commerce_title_field];
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORMID_alter()
+ */
+function mongo_commerce_form_commerce_backoffice_product_quick_edit_form_alter(&$form, &$form_state, &$product) {
+  // This hook is implemented to add additional handler for handling quick edit in MongoDB
+  global $_mongo_commerce_price_field;
+  $product_details = entity_get_controller('mongo_product')->fetchProductDetails($form_state['product']->product_id);
+  // Override the price value with the value in MongoDB:
+  // and add additional submit handler to save the price back to MongoDB.
+  $form['price']['#default_value'] = commerce_currency_amount_to_decimal($product_details[0][$_mongo_commerce_price_field]);
+  $form['#submit'][] = 'mongo_commerce_commerce_backoffice_product_quick_edit_form_submit';
+}
+
+/**
+ * Implements the additional submit handler for the Quick Edit form()
+ */
+function mongo_commerce_commerce_backoffice_product_quick_edit_form_submit($form, &$form_state) {
+  // This function is implemented to call the corresponding handler: 
+  // when quick edit is done from frontend.
+  entity_get_controller('mongo_product')->updateQuickEdit($form_state['build_info']['args'][0]->product_id, $form_state['build_info']['args'][0]->commerce_price);
+}
+
+/**
+ * Implements hook_commerce_cart_attributes_refresh_alter()
+ */
+function mongo_commerce_commerce_cart_attributes_refresh_alter(&$commands, $form, $form_state) {
+  // This hook is implemented to refresh the product data from MongoDB when:
+  // the color, size and product is selected.
+  global $_mongo_commerce_price_field;
+  global $_mongo_commerce_sku_field;
+  global $_mongo_commerce_title_field;
+  global $_mongo_commerce_image_field;
+
+  $product_details = array();
+  foreach ($commands as $key => $response) {
+    $document = new DOMDocument();
+    // These additional params for below function is to prevent from:
+    // creating this with html and body tags.
+    $document->loadHTML($commands[$key]['data'], LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+    $inputs = $document->getElementsByTagName('option');
+
+    foreach ($inputs as $input) {
+      if ($input->hasAttribute('selected')
+        && 'selected' === $input->getAttribute('selected')) {
+        $product_details = entity_get_controller('mongo_product')->fetchProductDetails($input->getAttribute('value'));
+        $_SESSION[$_mongo_commerce_sku_field] = 'SKU: ' . $product_details[0][$_mongo_commerce_sku_field];
+        $currency = commerce_currency_load();
+        $_SESSION[$_mongo_commerce_price_field] = commerce_currency_format($product_details[0][$_mongo_commerce_price_field], $currency['code']);
+      }
+    }
+
+    $tags = $document->getElementsByTagName('div');
+    // Below code is to alter the response with data from MongoDB:
+    // the first IF for SKU and 2nd for Price.
+    foreach ($tags as $tag) {
+      if ((strstr($commands[$key]['selector'], 'product-sku')) && ($tag->getAttribute('class') == 'commerce-product-sku')) {
+        if (!empty($_SESSION[$_mongo_commerce_sku_field])) {
+          $tag->nodeValue = $_SESSION[$_mongo_commerce_sku_field];
+        }
+      }
+      if ((strstr($commands[$key]['selector'], 'product-commerce-price')) && ($tag->getAttribute('class') == 'field-item even')) {
+        if (!empty($_SESSION[$_mongo_commerce_price_field])) {
+          $tag->nodeValue = $_SESSION[$_mongo_commerce_price_field];
+        }
+      }
+    }
+    if (strstr($commands[$key]['selector'], 'commerce-cart-add-to-cart-form')) {
+      $tags = $document->getElementsByTagName('option');
+      foreach ($tags as $tag) {
+        if (!empty($tag->getAttribute('value'))) {
+          $product_details = entity_get_controller('mongo_product')->fetchProductDetails($tag->getAttribute('value'));
+          if (count($product_details)) {
+            $tag->nodeValue = $product_details[0][$_mongo_commerce_title_field];
+          }
+        }
+      }
+    }
+    $commands[$key]['data'] = $document->saveHTML();
+  }
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function mongo_commerce_entity_delete($entity, $type) {
+  // Deletes referenced entities if needed.
+  list(, , $bundle) = entity_extract_ids($type, $entity);
+  foreach (field_info_instances($type, $bundle) as $field_name => $instance) {
+    if (strpos($instance['widget']['type'], 'inline_entity_form') === 0) {
+      $controller = inline_entity_form_get_controller($instance);
+
+      // The controller specified that referenced entities should be deleted.
+      if ($controller && $controller->getSetting('delete_references')) {
+        $items = field_get_items($type, $entity, $field_name);
+        if ($items) {
+          $field = field_info_field($field_name);
+          $ief_settings = inline_entity_form_settings($field, $instance);
+
+          $ids = array();
+          foreach ($items as $item) {
+            $ids[] = $item[$ief_settings['column']];
+          }
+          entity_get_controller('mongo_product')->delete($ids);
+        }
+      }
+    }
+  }
+}

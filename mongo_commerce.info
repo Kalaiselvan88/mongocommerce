@@ -1,0 +1,20 @@
+name = Mongo Commerce
+description = Provides the ability for Commerce Kickstart to manipulate with MongoDB (NOSQL)
+package = Commerce
+dependencies[] = system
+dependencies[] = entity
+dependencies[] = rules
+dependencies[] = commerce
+dependencies[] = mongodb
+dependencies[] = mongodb_field_storage
+core = 7.x
+
+; Central Entity Controller.
+files[] = includes/mongo_product.controller.inc
+
+; Information added by Drupal.org packaging script on 2017-05-04
+version = "7.x-1.0"
+core = "7.x"
+project = "mongocommerce"
+datestamp = "1493923088"
+
