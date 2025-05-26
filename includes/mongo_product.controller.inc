@@ -312,7 +312,7 @@ class MongoCommerceMongoProductEntityController extends CommerceProductEntityCon
   /**
    * Searches products in Mongo DB.
    *
-   * @param $search inputs
+   * @param array $search_criteria
    *   An array of form submit search inputs.
    *
    * @return
